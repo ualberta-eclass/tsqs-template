@@ -1,0 +1,195 @@
+# Welcome to serverless. Read the docs
+# https://serverless.com/framework/docs/
+
+# Serverless.yml is the configuration the CLI
+# uses to deploy your code to your provider of choice
+
+# The `service` block is the name of the service
+service: tsqs-template
+
+# The `provider` block defines where your service will be deployed
+provider:
+  name: aws
+  runtime: nodejs8.10
+  region: us-west-2
+  iamManagedPolicies:
+   - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+  iamRoleStatements:
+     - Effect: "Allow"
+       Action:
+         - "lambda:InvokeFunction"
+         - "lambda:InvokeAsync"
+       Resource:
+         - "arn:aws:lambda:us-east-1:${self:custom.accountNumber}:function:*"
+    #  - Effect: "Allow"
+    #    Action:
+    #      - "s3:*"
+    #    Resource:
+    #      - "arn:aws:s3:::bucket-name/*"
+
+     - Effect: "Allow"
+       Action:
+         - "dynamodb:BatchGetItem"
+         - "dynamodb:BatchWriteItem"
+         - "dynamodb:PutItem"
+         - "dynamodb:DeleteItem"
+         - "dynamodb:GetItem"
+         - "dynamodb:Scan"
+         - "dynamodb:Query"
+         - "dynamodb:UpdateItem"
+       Resource:
+         - "arn:aws:dynamodb:us-east-1:*:table/${self:service}-servicerequest"
+         - "arn:aws:dynamodb:us-west-2:862430624858:table/tsqs-template-servicerequest"
+
+# The `functions` block defines what code to deploy
+functions:
+  helloworld:
+    handler: helloworld.helloworld
+    # The `events` block defines how to trigger the handler.helloWorld code
+    events:
+      - http:
+          path: hello-world
+          method: get
+          cors: true
+  tokencallback:
+    handler: tokencallback.tokencallback
+    timeout: 10
+    # The `events` block defines how to trigger the handler.helloWorld code
+    events:
+      - http:
+          path: tokencallback
+          method: get
+          cors: true   
+  pythontest:
+    handler: lambda_function.lambda_handler
+    runtime: python2.7
+    events:
+      - http:
+          path: /pythontest
+          method: get
+          cors: false
+          integration: lambda
+          request:
+            template:
+              application/json: ${file(passthroughrequest.txt)}          
+  ltilogin:
+    handler: ltilogin.ltilogin
+    # The `events` block defines how to trigger the handler.helloWorld code
+    events:
+      - http:
+          path: ltilogin
+          method: post
+          cors: true
+  testwebservice:
+    handler: ltilogin.testwebservice
+    # vpc:
+    #   securityGroupIds:
+    #     - sg-01c73f2adc671d7bd
+    #   subnetIds:
+    #     - subnet-f4a389b2
+    #     - subnet-364da653
+    #     - subnet-abb4e183
+    #     - subnet-34939840
+    events:
+      - http:
+          path: /testwebservice
+          method: get
+          cors: false
+          integration: lambda
+          request:
+            template:
+              application/json: ${file(passthroughrequest.txt)}     
+plugins:
+  - serverless-s3-sync
+
+custom:
+  accountNumber: 862430624858 
+  siteName: ${self:service}-sn #serverless-public-uatest
+  s3Sync:
+    - bucketName: ${self:custom.siteName}
+      localDir: Resources/static
+resources:
+  Resources:
+    CourseRequest:
+     Type: AWS::DynamoDB::Table
+     Properties:
+      TableName: ${self:service}-servicerequest
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: N
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST    
+    StaticSite:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: PublicRead
+        BucketName: ${self:custom.siteName}
+        WebsiteConfiguration:
+          IndexDocument: index.html
+    StaticSiteS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: StaticSite
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+              - s3:GetObject
+              Resource:
+                Fn::Join: [
+                  "", [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "StaticSite"
+                    },
+                    "/*"
+                  ]
+                ] 
+    MainApiBasePath:
+      Type: AWS::ApiGateway::Resource
+      Properties:
+        ParentId:
+          Fn::GetAtt:
+            - ApiGatewayRestApi
+            - RootResourceId
+        PathPart: 'public'
+        RestApiId:
+          Ref: ApiGatewayRestApi
+    MainApiProxyPath:
+      Type: AWS::ApiGateway::Resource 
+      Properties:
+        ParentId:
+          Ref: MainApiBasePath
+        PathPart: '{proxy+}'
+        RestApiId:
+          Ref: ApiGatewayRestApi
+    MainApiProxyAnyMethod:
+      Type: AWS::ApiGateway::Method 
+      Properties:
+        AuthorizationType: NONE
+        HttpMethod: ANY
+        Integration: 
+          IntegrationHttpMethod: ANY
+          Type: HTTP_PROXY
+          Uri: https://${self:custom.siteName}.s3.${self:provider.region}.amazonaws.com/{proxy}
+          PassthroughBehavior: WHEN_NO_MATCH
+          RequestParameters:
+            'integration.request.path.proxy': 'method.request.path.proxy'
+        MethodResponses:
+          - StatusCode: 200
+        RequestParameters:
+            'method.request.path.proxy': true
+        ResourceId:
+          Ref: MainApiProxyPath
+        RestApiId:
+          Ref: ApiGatewayRestApi                       
+
+
+package:
+  exclude:
+    - Resources/**  

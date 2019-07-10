@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Spark demo</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <style>
+        body {
+            font-family: sans-serif;
+            font-size: 18px;
+            padding: 30px;
+            background-color: #f7b71db0;
+            text-align: center;
+        }
+
+        input {
+            min-width: 500px;
+        }
+
+        img {
+            max-height: 90px;
+        }
+        pre {
+            text-align: left;
+        }
+    </style>
+</head>
+
+<body>
+
+    <img src="https://spark.ualberta.ca/wp-content/uploads/2018/12/spark-light-2.png">
+
+    <p>Enter your API Gateway endpoint:</p>
+    <input id="endpoint" type="text">
+    <button id="hitit" class="btn-primary">send it</button>
+    <br><br>
+    <pre id="displayresult"></pre>
+
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.11/lodash.core.min.js"></script> -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script>
+        $(document).ready(function () {
+
+            $("#hitit").click(function () {
+                var endpoint = $("#endpoint").val();
+
+                $.get(endpoint, function (response) {
+                    var output = JSON.stringify(response, null, 2);
+
+                    $("#displayresult").html(output);
+                });
+
+
+            });
+        });
+    </script>
+</body>
+
+</html>
